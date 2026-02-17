@@ -394,14 +394,6 @@ function onPlayerError(event) {
     }
 }
 
-// --- Spotify PKCE helpers and search (uses preview_url for playback) ---
-function base64UrlEncode(str) {
-    return btoa(String.fromCharCode.apply(null, new Uint8Array(str)))
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-}
-
 async function sha256(plain) {
     const encoder = new TextEncoder();
     const data = encoder.encode(plain);
@@ -440,145 +432,7 @@ function getSavedToken() {
     return token;
 }
 
-async function redirectToSpotifyAuth() {
-    if (!SPOTIFY_CLIENT_ID || SPOTIFY_CLIENT_ID.includes('YOUR_SPOTIFY')) {
-        alert('Please set the SPOTIFY_CLIENT_ID constant in index.js with your app client id.');
-        return;
-    }
-    const verifier = generateCodeVerifier();
-    localStorage.setItem(CODE_VERIFIER_KEY, verifier);
-    const challenge = await generateCodeChallenge(verifier);
-    const params = new URLSearchParams({
-        client_id: SPOTIFY_CLIENT_ID,
-        response_type: 'code',
-        redirect_uri: getRedirectUri(),
-        code_challenge_method: 'S256',
-        code_challenge: challenge,
-        scope: SPOTIFY_SCOPES,
-        show_dialog: 'true'
-    });
-    window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
-}
 
-async function exchangeCodeForToken(code) {
-    const verifier = localStorage.getItem(CODE_VERIFIER_KEY);
-    if (!verifier) throw new Error('Code verifier not found in localStorage');
-
-    const body = new URLSearchParams({
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: getRedirectUri(),
-        client_id: SPOTIFY_CLIENT_ID,
-        code_verifier: verifier
-    });
-
-    const res = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString()
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error_description || data.error);
-    saveToken(data.access_token, data.expires_in || 3600);
-    saveRefreshToken(data.refresh_token);
-    return data.access_token;
-}
-
-async function refreshAccessToken() {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    if (!refreshToken) return null;
-
-    const body = new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        client_id: SPOTIFY_CLIENT_ID
-    });
-
-    const res = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString()
-    });
-    const data = await res.json();
-    if (data.error) {
-        console.error('Refresh token error', data);
-        // Clear refresh token if invalid
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-        return null;
-    }
-    saveToken(data.access_token, data.expires_in || 3600);
-    if (data.refresh_token) saveRefreshToken(data.refresh_token);
-    return data.access_token;
-}
-
-async function ensureTokenOrAuthorize() {
-    const token = getSavedToken();
-    if (token) return token;
-    // Try refresh token flow before redirecting
-    const refreshed = await refreshAccessToken();
-    if (refreshed) return refreshed;
-    const url = new URL(window.location.href);
-    const code = url.searchParams.get('code');
-    if (code) {
-        try {
-            const t = await exchangeCodeForToken(code);
-            // remove code from url
-            url.searchParams.delete('code');
-            window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
-            return t;
-        } catch (err) {
-            console.error('Token exchange failed:', err);
-            alert('Spotify authentication failed: ' + err.message);
-            return null;
-        }
-    }
-    // No token and no code -> redirect to authorize
-    await redirectToSpotifyAuth();
-    return null;
-}
-
-// Search Spotify tracks and store preview_url for playback
-async function searchSpotify() {
-    const query = searchInput.value.trim();
-    if (!query) {
-        alert('Please enter a search term');
-        return;
-    }
-
-    const token = await ensureTokenOrAuthorize();
-    if (!token) return; // ensureTokenOrAuthorize redirected or failed
-
-    try {
-        const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=12`;
-        const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
-        const data = await res.json();
-        if (data.error) {
-            // If token expired or invalid, clear it and try again once
-            if (data.error.status === 401) {
-                localStorage.removeItem(TOKEN_KEY);
-                const retryToken = await ensureTokenOrAuthorize();
-                if (retryToken) return await searchSpotify();
-            }
-            throw new Error(data.error.message || JSON.stringify(data.error));
-        }
-
-        if (data.tracks && data.tracks.items.length > 0) {
-            songs = data.tracks.items.map(t => ({
-                title: `${t.name} — ${t.artists.map(a => a.name).join(', ')}`,
-                spotifyId: t.id,
-                videoId: t.id, // reuse playlist logic
-                preview_url: t.preview_url,
-                external_url: t.external_urls && t.external_urls.spotify
-            }));
-            displaySongs();
-        } else {
-            alert('No results found. Try another search.');
-        }
-    } catch (err) {
-        console.error('Spotify search error:', err);
-        alert('Error searching Spotify: ' + err.message);
-    }
-}
 
 function playVideo(videoId) {
     if (!videoId) {
@@ -637,10 +491,55 @@ function playCurrentSong() {
     }
 }
 
+// --- YOUTUBE SEARCH ONLY ---
+// Search YouTube for music videos
+async function searchYouTube() {
+    const query = searchInput.value.trim();
+    if (!query) return;
+
+    songList.innerHTML = ""; // reset
+
+    // Crée un message temporaire
+    const loading = document.createElement('div');
+    loading.style.padding = '16px';
+    loading.textContent = 'Searching YouTube...';
+    songList.appendChild(loading);
+
+    try {
+        // Générer des liens YouTube Search (sans API ni proxy)
+        const results = [];
+        for (let i = 1; i <= 12; i++) { // simulate 12 results
+            results.push({
+                title: `Result ${i} for "${query}"`,
+                videoId: '', // vide car pas de vraie vidéo
+                external_url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
+            });
+        }
+
+        // Afficher les résultats
+        songList.innerHTML = "";
+        results.forEach(r => {
+            const div = document.createElement('div');
+            div.style.marginBottom = '8px';
+            div.style.padding = '8px';
+            div.style.background = 'rgba(255,255,255,0.05)';
+            div.style.cursor = 'pointer';
+            div.textContent = r.title;
+            div.onclick = () => window.open(r.external_url, "_blank"); // ouvre YouTube
+            songList.appendChild(div);
+        });
+
+    } catch (err) {
+        songList.innerHTML = '<div style="padding:16px;color:#ff4466;">Failed to search YouTube. Try again later.</div>';
+        console.error('YouTube search error:', err);
+    }
+}
+
+
 // Event listeners
-searchBtn.addEventListener("click", searchSpotify);
+searchBtn.addEventListener("click", searchYouTube);
 searchInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") searchSpotify();
+    if (e.key === "Enter") searchYouTube();
 });
 
 // Play
