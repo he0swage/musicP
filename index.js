@@ -523,9 +523,9 @@ async function searchYouTube() {
             div.style.marginBottom = '8px';
             div.style.padding = '8px';
             div.style.background = 'rgba(255,255,255,0.05)';
-            div.style.cursor = 'pointer';
+            div.style.cursor = 'default';
             div.textContent = r.title;
-            div.onclick = () => window.open(r.external_url, "_blank"); // ouvre YouTube
+            // No click event: do not open YouTube
             songList.appendChild(div);
         });
 
