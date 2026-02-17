@@ -1,15 +1,3 @@
-// Spotify client id: register an app at https://developer.spotify.com/dashboard/
-// Then set the CLIENT_ID value below. Also register the redirect URI to
-// point to this app (e.g. https://yourdomain.com/index.html).
-const SPOTIFY_CLIENT_ID = "YOUR_SPOTIFY_CLIENT_ID_HERE";
-const SPOTIFY_SCOPES = ""; // no scopes required for search/preview
-
-// Token storage keys
-const TOKEN_KEY = "spotify_access_token";
-const TOKEN_EXPIRES_AT = "spotify_token_expires_at";
-const REFRESH_TOKEN_KEY = "spotify_refresh_token";
-const CODE_VERIFIER_KEY = "spotify_code_verifier";
-
 let audio = new Audio();
 
 let songs = [];
@@ -34,7 +22,7 @@ const createPlaylistBtn = document.getElementById("create-playlist-btn");
 function loadPlaylists() {
     const saved = localStorage.getItem("musicPPlaylists");
     playlists = saved ? JSON.parse(saved) : [];
-    
+
     // Ensure "Liked Songs" playlist exists
     if (!playlists.find(p => p.id === "liked-songs")) {
         playlists.unshift({
@@ -45,7 +33,7 @@ function loadPlaylists() {
         });
         savePlaylists();
     }
-    
+
     displayPlaylists();
 }
 
@@ -94,7 +82,7 @@ function renamePlaylist(playlistId) {
     }
     const playlist = playlists.find(p => p.id === playlistId);
     if (!playlist) return;
-    
+
     const newName = prompt(`Rename "${playlist.name}" to:`, playlist.name);
     if (newName && newName.trim()) {
         playlist.name = newName.trim();
@@ -129,10 +117,10 @@ function displayPlaylists() {
     playlists.forEach(playlist => {
         const playlistDiv = document.createElement("div");
         playlistDiv.className = "playlist-item";
-        
+
         const header = document.createElement("div");
         header.className = "playlist-header";
-        
+
         let actionHTML = '';
         if (playlist.id !== "liked-songs") {
             actionHTML = `<div class="playlist-actions">
@@ -140,19 +128,19 @@ function displayPlaylists() {
                 <button onclick="deletePlaylist('${playlist.id}')" title="Delete"><i class="fas fa-trash"></i></button>
             </div>`;
         }
-        
+
         header.innerHTML = `
             <span>${playlist.name}</span>
             ${actionHTML}
         `;
-        
+
         const songsInfo = document.createElement("div");
         songsInfo.className = "playlist-songs";
         songsInfo.textContent = `${playlist.songs.length} song${playlist.songs.length !== 1 ? 's' : ''}`;
-        
+
         playlistDiv.appendChild(header);
         playlistDiv.appendChild(songsInfo);
-        
+
         // Display songs in playlist
         if (playlist.songs.length > 0) {
             const songsList = document.createElement("div");
@@ -161,7 +149,7 @@ function displayPlaylists() {
             songsList.style.overflowY = "auto";
             songsList.style.borderTop = "1px solid rgba(29, 185, 84, 0.3)";
             songsList.style.paddingTop = "8px";
-            
+
             playlist.songs.forEach(song => {
                 const songEl = document.createElement("div");
                 songEl.style.display = "flex";
@@ -170,13 +158,13 @@ function displayPlaylists() {
                 songEl.style.marginBottom = "5px";
                 songEl.style.color = "rgba(255, 255, 255, 0.8)";
                 songEl.style.cursor = "pointer";
-                
+
                 const title = document.createElement("span");
                 title.textContent = song.title.substring(0, 30) + (song.title.length > 30 ? "..." : "");
                 title.style.flex = "1";
                 title.style.cursor = "pointer";
                 title.onclick = () => playVideo(song.videoId);
-                
+
                 const removeBtn = document.createElement("button");
                 removeBtn.style.width = "20px";
                 removeBtn.style.height = "20px";
@@ -190,14 +178,14 @@ function displayPlaylists() {
                 removeBtn.style.cursor = "pointer";
                 removeBtn.onclick = () => removeSongFromPlaylist(playlist.id, song.videoId);
                 removeBtn.innerHTML = '<i class="fas fa-times"></i>';
-                
+
                 songEl.appendChild(title);
                 songEl.appendChild(removeBtn);
                 songsList.appendChild(songEl);
             });
             playlistDiv.appendChild(songsList);
         }
-        
+
         playlistsList.appendChild(playlistDiv);
     });
 }
@@ -216,7 +204,7 @@ function displaySongs() {
         songContainer.style.display = "flex";
         songContainer.style.alignItems = "center";
         songContainer.style.gap = "8px";
-        
+
         const div = document.createElement("div");
         div.textContent = song.title;
         div.classList.add("song-item");
@@ -334,9 +322,9 @@ function showPlaylistOptions(song) {
 function toggleLikeSong(song, heartBtn) {
     const likedPlaylist = playlists.find(p => p.id === "liked-songs");
     if (!likedPlaylist) return;
-    
+
     const isLiked = likedPlaylist.songs.find(s => s.videoId === song.videoId);
-    
+
     if (isLiked) {
         removeSongFromPlaylist(likedPlaylist.id, song.videoId);
         heartBtn.style.color = "rgba(255, 255, 255, 0.5)";
@@ -597,13 +585,13 @@ function playVideo(videoId) {
         alert("Error: No video ID provided");
         return;
     }
-    
+
     if (!player) {
         console.error("❌ Player not initialized yet. Try again in a moment.");
         alert("Player is initializing... Please try again in a moment.");
         return;
     }
-    
+
     console.log("Playing video:", videoId);
     try {
         player.loadVideoById(videoId);
