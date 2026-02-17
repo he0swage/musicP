@@ -506,29 +506,48 @@ async function searchYouTube() {
     songList.appendChild(loading);
 
     try {
-        // Générer des liens YouTube Search (sans API ni proxy)
-        const results = [];
-        for (let i = 1; i <= 12; i++) { // simulate 12 results
-            results.push({
-                title: `Result ${i} for "${query}"`,
-                videoId: '', // vide car pas de vraie vidéo
-                external_url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
-            });
+        // Use YouTube Data API v3 (requires API key) or a public endpoint
+        // For demo: use a public endpoint (no API key, limited results)
+        const apiKey = '';
+        let url;
+        if (apiKey) {
+            url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(query)}&key=${apiKey}`;
+        } else {
+            url = `https://yt.lemnoslife.com/noKey/search?part=snippet&type=video&maxResults=12&q=${encodeURIComponent(query)}`;
         }
+        const res = await fetch(url);
+        const data = await res.json();
+        let items = data.items || (data.videos ? data.videos : []);
+        // Normalize results
+        const results = items.map(item => {
+            const id = item.id && item.id.videoId ? item.id.videoId : (item.videoId || '');
+            const snippet = item.snippet || item;
+            return {
+                title: snippet.title,
+                videoId: id,
+                channel: snippet.channelTitle || snippet.author || '',
+                thumbnail: snippet.thumbnails && snippet.thumbnails.medium ? snippet.thumbnails.medium.url : '',
+            };
+        }).filter(r => r.videoId);
 
-        // Afficher les résultats
+        // Render clickable results that play in the embedded player
         songList.innerHTML = "";
         results.forEach(r => {
             const div = document.createElement('div');
+            div.className = 'song-item';
             div.style.marginBottom = '8px';
             div.style.padding = '8px';
             div.style.background = 'rgba(255,255,255,0.05)';
-            div.style.cursor = 'default';
+            div.style.cursor = 'pointer';
             div.textContent = r.title;
-            // No click event: do not open YouTube
+            div.onclick = () => {
+                if (player && r.videoId) {
+                    player.loadVideoById(r.videoId);
+                    currentTitle.textContent = r.title;
+                }
+            };
             songList.appendChild(div);
         });
-
     } catch (err) {
         songList.innerHTML = '<div style="padding:16px;color:#ff4466;">Failed to search YouTube. Try again later.</div>';
         console.error('YouTube search error:', err);
